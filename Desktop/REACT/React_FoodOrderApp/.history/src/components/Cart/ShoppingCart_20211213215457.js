@@ -1,0 +1,116 @@
+import { useContext, useState } from "react"
+import Checkout from "./Checkout"
+import style from "./ShoppingCart.module.css"
+import CartItem from "./CartItem"
+import Modal from "../UI/Modal"
+import CartContext from "../../StoreContext/cart-context"
+
+// parent is App.js
+const ShoppingCart = (props) => {
+  const [isCheckout, setIsCheckout] = useState(false)
+  const [httpError, setHttpError] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [didSubmit, setDidSubmit] = useState(false)
+  const cartCtx = useContext(CartContext)
+  const totalAmount = `$${cartCtx.totalAmount.toFixed(2)}`
+  const hasItems = cartCtx.items.length > 0
+
+  // enable decrease and increase amount of items in cart
+  const cartItemRemoveHandler = (id) => {
+    // call removeItemFromCartHandler from CarProvider
+    cartCtx.removeItem(id)
+  }
+
+  const cartItemAddHandler = (item) => {
+    //   call addItem func in CartProvider
+    cartCtx.addItem({ ...item, amount: 1 })
+  }
+
+  const orderHandler = () => {
+    setIsCheckout(true)
+  }
+
+  //userData is from child Checkout
+  const submitOrder = (userData) => {
+    setIsSubmitting(true)
+    const sendRequest = async () => {
+      //send request
+      const response = await fetch("https://foodapp-253e6-default-rtdb.firebaseio.com/order.json", {
+        method: "POST",
+        body: JSON.stringify({
+          user: userData,
+          orderedItems: cartCtx.items,
+        }),
+      })
+      if (!response.ok) {
+        throw new Error("cannot submit the form")
+      }
+    }
+    sendRequest().catch((error) => setHttpError(error.message))
+    setIsSubmitting(false)
+    setDidSubmit(true)
+    //clear cart once submitted the form
+    cartCtx.
+  }
+
+  const cartItems = (
+    <ul className={style["cart-items"]}>
+      {cartCtx.items.map((item) => (
+        <CartItem
+          key={item.id}
+          name={item.name}
+          price={item.price}
+          amount={item.amount}
+          //   bind(null,value) pass the value to handler, make sure the handler above receive the value
+          onRemove={cartItemRemoveHandler.bind(null, item.id)}
+          onAdd={cartItemAddHandler.bind(null, item)}
+        />
+      ))}
+    </ul>
+  )
+
+  const modalActions = (
+    <div className={style.actions}>
+      <button onClick={props.onClose} className={style["button--alt"]}>
+        Close
+      </button>
+      {hasItems && (
+        <button className={style.button} onClick={orderHandler}>
+          Order
+        </button>
+      )}
+    </div>
+  )
+
+  const cartContent = (
+    <>
+      {cartItems}
+      <div className={style.total}>
+        <span>Total amount</span>
+        <span>{totalAmount}</span>
+      </div>
+      {isCheckout && <Checkout onConfirm={submitOrder} onCancel={props.onClose} />}
+      {!isCheckout && modalActions}
+    </>
+  )
+
+  const isSubmittingContent = <p>sending order data...</p>
+  const didSubmitContent = (
+    <>
+      <p>successfully sent the order!</p>
+      <div className={style.actions}>
+        <button onClick={props.onClose} className={style["button--alt"]}>
+          Close
+        </button>
+      </div>
+    </>
+  )
+  return (
+    <Modal onClose={props.onClose}>
+      {!isSubmitting && !didSubmit && cartContent}
+      {isSubmitting && isSubmittingContent}
+      {didSubmit && didSubmitContent}
+    </Modal>
+  )
+}
+export default ShoppingCart
